@@ -1,0 +1,5 @@
+
+set(SOURCES
+	${SOURCES_PREFIX}/Modbus.cpp
+	${SOURCES_PREFIX}/ModbusRtu.cpp
+	PARENT_SCOPE)
