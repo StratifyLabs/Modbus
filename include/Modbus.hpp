@@ -5,22 +5,45 @@
 #include <sapi/sys/Thread.hpp>
 #include <sapi/var/Data.hpp>
 #include <sapi/chrono/MicroTime.hpp>
+#include <sapi/chrono/Timer.hpp>
+#include <sapi/var/String.hpp>
 
 namespace mbus {
 
-class ModbusPhy {
+class ModbusObject {
+public:
+    const var::String & error_message() const {
+        return m_error_message;
+    }
+
+protected:
+    void set_error_message(const var::ConstString & value){ m_error_message = value; }
+
+private:
+    var::String m_error_message;
+};
+
+class ModbusPhy : public ModbusObject {
 public:
     virtual int initialize(){ return 0; } //success if not implemented
     virtual int finalize(){ return 0; } //success if not implemented
     virtual int send(const var::Data & data) = 0;
-    virtual int receive(var::Data & data) = 0;
+    virtual var::Data receive() = 0;
+
+    void flush(){ buffer().free(); }
 
     u8 calculate_lrc(const var::Data & data);
     u16 calculate_crc(const var::Data & data);
+
+protected:
+    var::Data & buffer(){ return m_buffer; }
+
+private:
+    var::Data m_buffer;
 };
 
 
-class Modbus {
+class Modbus : public ModbusObject {
 public:
     Modbus(ModbusPhy & phy);
 
@@ -60,6 +83,15 @@ public:
         WRITE_GENERAL_REFERENCE = 0x21
     };
 
+    void set_max_packet_size(u32 value){
+        m_max_packet_size = value;
+    }
+
+    u32 max_packet_size() const {
+        return m_max_packet_size;
+    }
+
+protected:
     int send_read_holding_registers_query(u8 slave_address, u16 register_address, u16 number_of_points);
     int send_read_holding_registers_response(u8 slave_address, const var::Data & data);
 
@@ -82,14 +114,40 @@ private:
 
     ModbusPhy & m_phy;
     u16 m_exception_code;
+    u32 m_max_packet_size;
 
 
 
 };
 
+class ModbusMaster : public Modbus {
+public:
+    ModbusMaster(ModbusPhy & phy) : Modbus(phy){
+        m_timeout = chrono::MicroTime::from_milliseconds(100);
+    }
+
+    int initialize(){
+        int result = phy().initialize();
+        if( result < 0 ){
+            set_error_message(var::String().format("phy initialize; %s", phy().error_message().to_char()));
+        }
+        return result;
+    }
+    void finalize(){ phy().finalize(); }
+
+    var::Data read_holding_registers(u8 slave_address, u16 register_address, u16 number_of_points);
+    int preset_single_register(u8 slave_address, u16 register_address, u16 value);
+
+private:
+    var::Data wait_for_response();
+    chrono::MicroTime m_timeout;
+};
+
 class ModbusSlave : public Modbus {
 public:
-    ModbusSlave(ModbusPhy & phy, int stack_size = 1024) : Modbus(phy), m_thread(stack_size){}
+    ModbusSlave(ModbusPhy & phy, int stack_size = 1024) : Modbus(phy), m_thread(stack_size){
+        set_polling_interval(10*1000);
+    }
 
     int initialize();
     void finalize(){
@@ -115,8 +173,10 @@ public:
         m_interval = interval;
     }
 
+    const chrono::MicroTime polling_interval() const { return m_interval; }
 
 private:
+    u32 m_max_packet_size;
     volatile bool m_is_running;
     u8 m_slave_address;
     sys::Thread m_thread;
