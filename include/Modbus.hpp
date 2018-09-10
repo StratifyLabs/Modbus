@@ -123,7 +123,7 @@ private:
 class ModbusMaster : public Modbus {
 public:
     ModbusMaster(ModbusPhy & phy) : Modbus(phy){
-        m_timeout = chrono::MicroTime::from_milliseconds(100);
+		m_timeout = chrono::MicroTime::from_milliseconds(1000);
     }
 
     int initialize(){
