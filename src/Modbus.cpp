@@ -73,7 +73,6 @@ var::Data ModbusMaster::read_holding_registers(u8 slave_address, u16 register_ad
 
     if( send_read_holding_registers_query(slave_address, register_address, number_of_points) < 0 ){
         //send_read_holding_registers_query() sets the error message
-        printf("Error is %s\n", error_message().to_char());
         return result;
     }
 
@@ -109,7 +108,6 @@ var::Data ModbusMaster::read_holding_registers(u8 slave_address, u16 register_ad
         }
     }
 
-    result.set_transfer_ownership();
     return result;
 }
 
@@ -159,7 +157,6 @@ var::Data ModbusMaster::wait_for_response(){
         incoming_packet = phy().receive();
     } while( (incoming_packet.size() == 0) && (timer.microseconds() < m_timeout) );
 
-    incoming_packet.set_transfer_ownership();
     return incoming_packet;
 }
 
