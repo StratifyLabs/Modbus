@@ -146,7 +146,7 @@ private:
 class ModbusSlave : public Modbus {
 public:
     ModbusSlave(ModbusPhy & phy, int stack_size = 1024) : Modbus(phy), m_thread(stack_size){
-        set_polling_interval(10*1000);
+		set_polling_interval(chrono::MicroTime(10000));
     }
 
     int initialize();

@@ -1,4 +1,5 @@
 #include <sapi/var.hpp>
+#include <sapi/chrono.hpp>
 #include "Modbus.hpp"
 
 using namespace mbus;
@@ -18,8 +19,11 @@ int Modbus::send_read_holding_registers_query(u8 slave_address, u16 register_add
 }
 
 int Modbus::send_read_holding_registers_response(u8 slave_address, const var::Data & data){
-	Data packet = data; //make a copy
-	packet.swap_byte_order(2); //convert to big endian
+	Data swap_data = data; //make a copy
+	swap_data.swap_byte_order(2); //convert to big endian
+	Data packet;
+	packet << (u8)data.size();
+	packet << data;
 	return send_response(slave_address, READ_HOLDING_REGISTERS, packet);
 }
 
@@ -155,7 +159,7 @@ var::Data ModbusMaster::wait_for_response(){
 
 	do {
 		incoming_packet = phy().receive();
-	} while( (incoming_packet.size() == 0) && (timer.microseconds() < m_timeout) );
+	} while( (incoming_packet.size() == 0) && (timer < m_timeout) );
 
 	return incoming_packet;
 }
@@ -190,7 +194,6 @@ void * ModbusSlave::listen(){
 			args.swap_byte_order(2);
 
 			if( device_address == m_slave_address ){
-
 				set_exception_code(NONE);
 				switch(function_code){
 					case PRESET_SINGLE_REGISTER:
